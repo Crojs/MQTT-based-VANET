@@ -10,13 +10,11 @@ import netifaces as ni
 import threading
 import json
 
-DEVICE_ID = "DEVICE 1"
 DEVICE_IPs = ["192.168.1.3", "192.168.1.2", "192.168.1.1"]
-# DEVICE_IPs = ["192.168.1.1", "192.168.1.3"]
-
+INTERFACE = 'wlp3s0'
+RSA_LEN = 1024
 hostname = socket.gethostname()
-LOCAL_IP = ni.ifaddresses('wlp3s0')[ni.AF_INET][0]['addr']
-print("Device ID:", DEVICE_ID)
+LOCAL_IP = ni.ifaddresses(INTERFACE)[ni.AF_INET][0]['addr']
 print("LOCAL IP:", LOCAL_IP)
 
 
@@ -111,11 +109,10 @@ for i, ip in enumerate(DEVICE_IPs):
             MQTT_CONS[ip]["MQTT"].on_message = on_message
         MQTT_CONS[ip]["MQTT"].connect(ip, 1883, 60)
 
-        # if(ip != LOCAL_IP):
         print("publishing to", ip)
-        privateKey = RSA.generate(1024)
-        PRIVATE_KEYS[ip] = privateKey
         # Generate a new RSA key pair
+        privateKey = RSA.generate(RSA_LEN)
+        PRIVATE_KEYS[ip] = privateKey
         
         publicKey = privateKey.publickey()
         decoded_key = publicKey.exportKey("OpenSSH").decode('utf-8')[8:]
@@ -132,11 +129,3 @@ for i, ip in enumerate(DEVICE_IPs):
 
 publish_thread = threading.Thread(target = publish_message_job, args = (MQTT_CONS, ip))
 publish_thread.start()
-
-# Blocking call that processes network traffic, dispatches callbacks and
-# handles reconnecting.
-# Other loop*() functions are available that give a threaded interface and a
-# manual interface.
-# mqttc.loop_start()
-
-
