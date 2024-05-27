@@ -12,13 +12,11 @@ import netifaces as ni
 import threading
 import json
 
-DEVICE_ID = "DEVICE 1"
 DEVICE_IPs = ["192.168.1.3", "192.168.1.2", "192.168.1.1"]
-# DEVICE_IPs = ["192.168.1.1", "192.168.1.3"]
-
+INTERFACE = 'wlp3s0'
+RSA_LEN = 1024
 hostname = socket.gethostname()
-LOCAL_IP = ni.ifaddresses('wlp3s0')[ni.AF_INET][0]['addr']
-print("Device ID:", DEVICE_ID)
+LOCAL_IP = ni.ifaddresses(INTERFACE)[ni.AF_INET][0]['addr']
 print("LOCAL IP:", LOCAL_IP)
 
 
@@ -46,7 +44,7 @@ def on_message(client, userdata, msg):
         pubRsaKey = RSA.import_key(publicKey)
         PUBLIC_KEYS[payload_list[1]] = pubRsaKey
         
-        privateKey = RSA.generate(1024)
+        privateKey = RSA.generate(RSA_LEN)
         PRIVATE_KEYS[ip] = privateKey
         
         # Generate a new RSA key pair
@@ -129,7 +127,7 @@ for i, ip in enumerate(DEVICE_IPs):
 
         # if(ip != LOCAL_IP):
         print("publishing to", ip)
-        privateKey = RSA.generate(1024)
+        privateKey = RSA.generate(RSA_LEN)
         PRIVATE_KEYS[ip] = privateKey
         # Generate a new RSA key pair
         
