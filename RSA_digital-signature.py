@@ -12,7 +12,7 @@ import netifaces as ni
 import threading
 import json
 
-DEVICE_IPs = ["192.168.1.3", "192.168.1.2", "192.168.1.1"]
+DEVICE_IPs = ["192.168.1.3", "192.168.1.1", "192.168.1.2"]
 INTERFACE = 'wlp3s0'
 RSA_LEN = 1024
 hostname = socket.gethostname()
@@ -95,9 +95,9 @@ def publish_message_job(MQTT_CONS, ip):
         if(IS_READY[ip]) == True:
             # ENCRYPT
             cipher_rsa = PKCS1_OAEP.new(PUBLIC_KEYS[ip])
-            encrypted = cipher_rsa.encrypt(base64.b64decode(message))
+            encrypted = cipher_rsa.encrypt(message.encode())
             # DIGITAL SIGNATURE
-            hash = SHA256.new(base64.b64decode(message))
+            hash = SHA256.new(message.encode())
             signer = PKCS115_SigScheme(PRIVATE_KEYS[ip])
             signature = signer.sign(hash)
 
