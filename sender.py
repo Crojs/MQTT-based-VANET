@@ -11,8 +11,8 @@ import threading
 import json
 
 DEVICE_ID = "DEVICE 1"
-# DEVICE_IPs = ["192.168.1.1", "192.168.1.3", "192.168.1.2"]
-DEVICE_IPs = ["192.168.1.1", "192.168.1.3"]
+DEVICE_IPs = ["192.168.1.3", "192.168.1.2", "192.168.1.1"]
+# DEVICE_IPs = ["192.168.1.1", "192.168.1.3"]
 
 hostname = socket.gethostname()
 LOCAL_IP = ni.ifaddresses('wlp3s0')[ni.AF_INET][0]['addr']
@@ -43,13 +43,14 @@ def on_message(client, userdata, msg):
         # print(publicKey)
         pubRsaKey = RSA.import_key(publicKey)
         aes_key = get_random_bytes(16)
+        PRIVATE_KEYS[payload_list[1]] = aes_key
         cipher = PKCS1_OAEP.new(pubRsaKey)
         aes_encrypted = cipher.encrypt(aes_key)
         message = base64.b64encode(aes_encrypted).decode('utf-8')
         message = "2+"+LOCAL_IP+"+"+message
         print(message)
         MQTT_CONS[payload_list[1]]["MQTT"].publish("incoming/", message)
-
+        IS_READY[payload_list[1]] = True
     if(payload_list[0] == "2"):
         # print(PRIVATE_KEYS)
         encryptedAesKey = payload_list[2]
@@ -111,7 +112,7 @@ for i, ip in enumerate(DEVICE_IPs):
 
         # if(ip != LOCAL_IP):
         print("publishing to", ip)
-        privateKey = RSA.generate(3072)
+        privateKey = RSA.generate(1024)
         PRIVATE_KEYS[ip] = privateKey
         # Generate a new RSA key pair
         
