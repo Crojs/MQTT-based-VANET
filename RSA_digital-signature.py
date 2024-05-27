@@ -3,6 +3,8 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
+from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
 from base64 import b64encode
 import paho.mqtt.client as mqtt
 import socket
@@ -22,6 +24,7 @@ print("LOCAL IP:", LOCAL_IP)
 
 MQTT_CONS = {}
 PRIVATE_KEYS = {}
+PUBLIC_KEYS = {}
 IS_READY = {}
 
 def on_connect(client, userdata, flags, reason_code, properties):
@@ -38,38 +41,46 @@ def on_message(client, userdata, msg):
 
     if(payload_list[0] == "1"):
         publicKey = payload_list[2]
-
         publicKey = "ssh-rsa " + publicKey
         # print(publicKey)
         pubRsaKey = RSA.import_key(publicKey)
-        aes_key = get_random_bytes(16)
-        PRIVATE_KEYS[payload_list[1]] = aes_key
-        cipher = PKCS1_OAEP.new(pubRsaKey)
-        aes_encrypted = cipher.encrypt(aes_key)
-        message = base64.b64encode(aes_encrypted).decode('utf-8')
-        message = "2+"+LOCAL_IP+"+"+message
+        PUBLIC_KEYS[payload_list[1]] = pubRsaKey
+        
+        privateKey = RSA.generate(1024)
+        PRIVATE_KEYS[ip] = privateKey
+        
+        # Generate a new RSA key pair
+        publicKey = privateKey.publickey()
+        decoded_key = publicKey.exportKey("OpenSSH").decode('utf-8')[8:]
+        message = "2+"+LOCAL_IP+"+"+decoded_key
         print(message)
         MQTT_CONS[payload_list[1]]["MQTT"].publish("incoming/", message)
         IS_READY[payload_list[1]] = True
+        print(payload_list[1], "Ready")
     if(payload_list[0] == "2"):
-        # print(PRIVATE_KEYS)
-        encryptedAesKey = payload_list[2]
-        cipherRsa = PKCS1_OAEP.new(PRIVATE_KEYS[payload_list[1]])
-        encryptedAesKey = base64.b64decode(encryptedAesKey)
-        aesKey = cipherRsa.decrypt(encryptedAesKey)
-        print(base64.b64encode(aesKey).decode('utf-8'))
-        PRIVATE_KEYS[payload_list[1]] = base64.b64encode(aesKey).decode('utf-8')
+        publicKey = payload_list[2]
+        publicKey = "ssh-rsa " + publicKey
+        pubRsaKey = RSA.import_key(publicKey)
+        PUBLIC_KEYS[payload_list[1]] = pubRsaKey
+        
         IS_READY[payload_list[1]] = True
+        print(payload_list[1], "Ready")
 
     if(payload_list[0] == "3"):
         json_message = json.loads(payload_list[2])
         print(json_message)
         ciphertext = base64.b64decode(json_message['ciphertext'])
-        nonce = base64.b64decode(json_message['nonce'])
-        tag = base64.b64decode(json_message['tag'])
-        cipher_aes = AES.new(PRIVATE_KEYS[payload_list[1]].encode("utf-8"), AES.MODE_EAX, nonce)
-        decrypted_message = cipher_aes.decrypt_and_verify(ciphertext, tag)
-        print (payload_list[1]+":", decrypted_message.decode('utf-8'))
+        signature = base64.b64decode(json_message['signature'])
+        cipher_rsa = PKCS1_OAEP.new(PRIVATE_KEYS[payload_list[1]])
+        decrypted = cipher_rsa.decrypt(ciphertext)
+        
+        hash = SHA256.new(decrypted)
+        verifier = PKCS115_SigScheme(PUBLIC_KEYS[payload_list[1]])
+        try:
+            verifier.verify(hash, signature)
+            print (payload_list[1]+":", decrypted.decode('utf-8'))
+        except:
+            print("Signature is invalid.")
 
 
 threads = []
@@ -84,13 +95,19 @@ def publish_message_job(MQTT_CONS, ip):
         user_input = input("Enter [ip] [message]")
         ip, message = user_input.split(" ", 1)
         if(IS_READY[ip]) == True:
-            cipher = AES.new(PRIVATE_KEYS[ip].encode("utf8"), AES.MODE_EAX)
-            ciphertext, tag = cipher.encrypt_and_digest(message.encode('utf-8'))
+            # ENCRYPT
+            cipher_rsa = PKCS1_OAEP.new(PUBLIC_KEYS[ip])
+            encrypted = cipher_rsa.encrypt(base64.b64decode(message))
+            # DIGITAL SIGNATURE
+            hash = SHA256.new(base64.b64decode(message))
+            signer = PKCS115_SigScheme(PRIVATE_KEYS[ip])
+            signature = signer.sign(hash)
+
             message = {
-                'ciphertext': base64.b64encode(ciphertext).decode('utf-8'),
-                'nonce': base64.b64encode(cipher.nonce).decode('utf-8'),
-                'tag': base64.b64encode(tag).decode('utf-8')
+                'ciphertext': base64.b64encode(encrypted).decode('utf-8'),
+                'signature': base64.b64encode(signature).decode('utf-8')
             }
+
             MQTT_CONS[ip]["MQTT"].publish("incoming/", "3+"+LOCAL_IP+"+"+json.dumps(message))
         else:
             print("Host not yet ready")
