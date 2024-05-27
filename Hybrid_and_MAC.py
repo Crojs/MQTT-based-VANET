@@ -43,9 +43,9 @@ def on_message(client, userdata, msg):
         # print(publicKey)
         pubRsaKey = RSA.import_key(publicKey)
         aes_key = get_random_bytes(16)
-        PRIVATE_KEYS[payload_list[1]] = aes_key
+        PRIVATE_KEYS[payload_list[1]] =  base64.b64encode(aes_key).decode('utf-8')
         cipher = PKCS1_OAEP.new(pubRsaKey)
-        aes_encrypted = cipher.encrypt(aes_key)
+        aes_encrypted = cipher.encrypt(aes_key) 
         message = base64.b64encode(aes_encrypted).decode('utf-8')
         message = "2+"+LOCAL_IP+"+"+message
         print(message)
@@ -92,6 +92,7 @@ def publish_message_job(MQTT_CONS, ip):
                 'tag': base64.b64encode(tag).decode('utf-8')
             }
             MQTT_CONS[ip]["MQTT"].publish("incoming/", "3+"+LOCAL_IP+"+"+json.dumps(message))
+            print("Message sent...")
         else:
             print("Host not yet ready")
 
