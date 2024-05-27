@@ -146,11 +146,3 @@ for i, ip in enumerate(DEVICE_IPs):
 
 publish_thread = threading.Thread(target = publish_message_job, args = (MQTT_CONS, ip))
 publish_thread.start()
-
-# Blocking call that processes network traffic, dispatches callbacks and
-# handles reconnecting.
-# Other loop*() functions are available that give a threaded interface and a
-# manual interface.
-# mqttc.loop_start()
-
-
